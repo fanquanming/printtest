@@ -1,0 +1,57 @@
+﻿#prompt_top, #xprompt_top, #sprompt_top {
+    position: absolute;
+    z-index: 163;
+    height: 100%;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+}
+
+/*#prompt_shadow
+{
+    position: absolute;
+    z-index: 64;
+    width: 420px;
+    -webkit-box-shadow: 0px 0px 30px #808080;
+    -moz-box-shadow: 0px 0px 30px #808080;
+    box-shadow: 0px 0px 30px #808080;
+    height: 180px;
+}*/
+
+#prompt_table, #xprompt_table, #sprompt_table {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    z-index: 165;
+    /*width: 420px;
+     height: 180px;*/
+}
+
+#prompt_title, #xprompt_title, #sprompt_title {
+    background-position: 10px 3px;
+    background-repeat: no-repeat;
+    padding-left: 36px;
+    background-image: url("/image/bg/boxlog.png");
+}
+
+#prompt_body, #xprompt_body, #sprompt_body {
+    background-color: #ffffff;
+    width: 450px;
+    -webkit-box-shadow: 0 0px 13px 0px #ccc;
+    -moz-box-shadow: 0 0px 13px 0px #ccc;
+    box-shadow: 0 0px 13px 0px #ccc;
+}
+
+#prompt_text, #xprompt_text, #sprompt_text {
+    /*font-size: 14px;
+    font-family: 'Microsoft YaHei';*/
+    padding-bottom: 12px;
+    text-align: left;
+    color: #666;
+}
+
+#prompt_btn_div, #xprompt_btn_div, #sprompt_btn_div {
+    margin: 10px;
+    text-align: right;
+    background-color: #fff;
+}

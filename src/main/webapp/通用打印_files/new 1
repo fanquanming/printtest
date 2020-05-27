@@ -1,0 +1,46 @@
+<script language="javascript" id="_request_authorize_co_id" type="text/javascript">
+var ___RequestAuthorizeCoid=0;
+</script>
+<script language="javascript" id="Hxj_Web_UI_Script_jquery-1_8_0_js" type="text/javascript" src="./通用打印_files/WebResource.axd"></script>
+<script language="javascript" id="Hxj_Web_UI_Script_jquery_json-2_4_js" type="text/javascript" src="./通用打印_files/WebResource(1).axd"></script>
+<link id="Hxj_Web_UI_Css_jquery_css" href="./通用打印_files/WebResource(2).axd" rel="stylesheet" type="text/css">
+<script language="javascript" id="Hxj_Web_UI_Script_hxj-jquery-1_0_0_js" type="text/javascript" src="./通用打印_files/WebResource(3).axd">
+</script><link id="wulong.iconfont" href="./通用打印_files/font_816790_nxi2aehu5gi.css" rel="stylesheet" type="text/css">
+<script language="javascript" id="Hxj.Web.UI.ACall_CallPage" type="text/javascript">
+var _Call_PostForm={};
+function _CallPage(method,oArgs)
+{var oPostArg=oArgs;
+if(arguments.length>2)
+{var oPostArg=new Array();
+for(var iAa1=1;iAa1<arguments.length;iAa1++)
+{if(arguments[iAa1]==null)
+{oPostArg.push(null);}
+else{oPostArg.push(arguments[iAa1].toString());
+}
+}
+};
+return $.call('ACall1',oPostArg,method,'{page}',null,true)}
+</script>
+<script language="javascript" id="Hxj.Web.UI.ACall_AsyncCallPage" type="text/javascript">
+function _AsyncCallPage(method,callBack,showWait,oArgs)
+{var oPostArg=oArgs;if(arguments.length>4)
+{var oPostArg=new Array();
+for(var iAa1=3;iAa1<arguments.length;iAa1++)
+{if(arguments[iAa1]==null){oPostArg.push(null);}
+else{oPostArg.push(arguments[iAa1].toString());}}};
+return $.call('ACall1',oPostArg,method,'{page}',callBack,showWait)};
+
+
+
+
+
+ function _ACP(method,callBack,oArgs)
+ {var oPostArg=oArgs;
+ if(arguments.length>2)
+ {var oPostArg=new Array();
+ for(var iAa1=2;iAa1<arguments.length;iAa1++){
+ if(arguments[iAa1]==null)
+ {oPostArg.push(null);}
+ else{oPostArg.push(arguments[iAa1].toString());}}};
+ return $.call('ACall1',oPostArg,method,'{page}',callBack,true)}
+ </script>

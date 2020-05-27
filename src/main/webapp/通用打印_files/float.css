@@ -1,0 +1,114 @@
+﻿
+#float_opacity
+{
+    top: 0;
+    left: 0;
+    filter: alpha(opacity=70);
+    opacity: 0.7;
+    background-color: #fff;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    z-index: 60;
+}
+#float_close_btn
+{
+    cursor: pointer;
+    padding: 4px;
+}
+
+#float_temp_div
+{
+    position: absolute;
+    background-color: #fff;
+    left: 100%;
+    margin-left: -81px;
+    z-index: 67;
+    width: 80px;
+    height: 38px;
+    top: 1px;
+    text-align:right;
+}
+
+#float_frame.dock.right, #float_frame.dock.left, #float_frame.dock.center
+{
+    position: absolute;
+    top: 0px;
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0px;
+}
+
+#float_frame.dock.top, #float_frame.dock.bottom, #float_frame.dock.middle
+{
+    position: absolute;
+    left: 0px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0px;
+}
+
+.dock.middle
+{
+}
+
+#float_frame.dock.left
+{
+    border-left: none;
+    left: 0px;
+}
+
+#float_frame.dock.right
+{
+    left: 100%;
+    border-right: none;
+}
+
+#float_frame.dock.center
+{
+    left: 0px;
+    border-right: none;
+}
+
+#float_top
+{
+    position: absolute;
+    z-index: 62;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#float_shadow
+{
+    /*position:absolute;
+    z-index:64;*/
+    /*-webkit-box-shadow: 0px 0px 30px #666;
+    -moz-box-shadow: 0px 0px 30px #666;
+    box-shadow: 0px 0px 30px #666;
+
+     border-radius:3px;*/
+}
+
+#float_table
+{
+    /*background-color: #ffffff;*/
+  /*position: relative;*/
+}
+
+
+
+#float_frame
+{
+    z-index: 66;
+    position: absolute;
+    background-color: #ffffff;
+    border-radius: 3px;
+    overflow: hidden;
+    -webkit-box-shadow: 0px 0px 15px #999;
+    -moz-box-shadow: 0px 0px 15px #999;
+    box-shadow: 0px 0px 15px #999;
+    /*border: 1px solid #cccccc;*/
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mapper.PrintpageMapper">
+	<!--查找所有的页面信息-->
+	<select id="selectAll"  resultType="com.entity.Printpage" >
+		select * from printpage;
+	</select>
+	<!-- 插入一条页面数据-->
+	<insert id="save" parameterType="com.entity.Printpage">
+		insert into printpage(company,content,registertime,updatetime) values (#{company},#{content},#{registertime},#{updatetime});
+	</insert>
+</mapper>

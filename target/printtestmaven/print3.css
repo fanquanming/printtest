@@ -1,0 +1,91 @@
+body {
+	margin: 0;
+	padding: 0;
+	background-color: #FAFAFA;
+	font: 8pt "Tahoma";
+}
+
+
+.page {
+	width : 241mm;
+	overflow:hidden;
+    padding-bottom: 60px;
+}
+
+.subpage li {
+	float: left;
+	list-style-type: none;
+}
+
+.title {
+	float: left;
+	width: 100%;
+	font-size: 18pt;
+	font-family: ����;
+	text-align: center;
+}
+
+.conbody {
+	float: left;
+	width: 21cm;
+	height: 3.3cm;
+}
+
+.zdfield {
+	float: left;
+	height: auto;
+	width: 21cm;
+	font-size:10px;
+	padding-left: 30px;
+}
+
+.zdfield li {
+	float: left;
+	width: 308px;
+	height:30px;
+	margin-left: -25px;
+	line-height: 38px;
+}
+
+.product {
+    width: 241mm;
+}
+.content {
+	float: left;
+	width: 95%;
+	margin-left: 15px;
+	line-height: 38px;
+	border: 1px solid #000;
+	border-width: 1px 0 0 0;
+}
+
+table.gridtable {
+	float:left;
+	width: 97%;
+	font-family: verdana, arial, sans-serif;
+	font-size: 11px;
+	color: #333333;
+	border-width: 1px;
+	border-color: #666666;
+	border-collapse: collapse;
+}
+
+table.gridtable th {
+	border-width: 1px;
+	padding: 8px;
+	border-style: solid;
+	border-color: #666666;
+	background-color: #dedede;
+}
+
+
+table.gridtable td {
+	border-width: 1px;
+	padding: 8px;
+	border-style: solid;
+	border-color: #666666;
+	background-color: #ffffff;
+	word-break:break-all;
+	word-wrap:break-word;
+	max-height:20px;
+}

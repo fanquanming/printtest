@@ -1,0 +1,663 @@
+﻿/// <reference path="jquery-1.11.0.js" />
+
+function CnpWebSocket(protocol) {
+    if (!(this instanceof CnpWebSocket)) {
+        return new CnpWebSocket(protocol);
+    }
+
+    function __getUUID(len, radix) {
+        var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('');
+        var uuid = [], i;
+        radix = radix || chars.length;
+        if (len) {
+            for (i = 0; i < len; i++) uuid[i] = chars[0 | Math.random() * radix];
+        } else {
+            var r;
+            uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
+            uuid[14] = '4';
+            for (i = 0; i < 36; i++) {
+                if (!uuid[i]) {
+                    r = 0 | Math.random() * 16;
+                    uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];
+                }
+            }
+        }
+        return uuid.join('');
+    }
+
+    function __getRequest(cmd) {
+        var request = new Object();
+        request.requestID = __getUUID(8, 16);
+        request.version = "1.0";
+        request.cmd = cmd;
+        return request;
+    }
+
+    function __receive(ws, msg)
+    {
+        var response = JSON.parse(msg);
+
+        if (typeof (ws.onReceived) == "function")
+        {
+            ws.onReceived(response);
+        }
+
+        var cmd = response.cmd;
+
+        if (cmd == "print" || cmd == "getPrinters")
+        {
+            var pi = response.requestID;
+            if (typeof (pi) != "undefined")
+            {
+                var pp = ws.msgData["p" + pi];
+
+                if (pp != null &&
+                    typeof (pp) != "undefined" &&
+                    pp.hasOwnProperty("callback") &&
+                    typeof (pp["callback"]) == "function")
+                {
+                    try
+                    {
+                        _AddlocalStorage(__FH_1CheckPrint, pp["data"], cmd);
+
+                        pp.callback(pp["state"], pp["data"], response);
+                    }
+                    catch (ex)
+                    {
+                        console.log(ws.appName + " callback error:", ex);
+                    }
+                }
+                ws.msgData["p" + pi] = null;
+
+                //接收到Response时，执行下一个。					
+                __next(ws);
+                ws.msgTimer = -1;
+            }
+        }
+        else if (cmd == "notifyPrintResult")
+        {
+            /*
+             18:打印渲染失败,文档被取消
+             21:print job was restarted
+             23:打印任务错误,文档被取消
+             */
+            if (__IsShowPrintErrorMsg && (response.errorCode == 18 ||
+                response.errorCode == 21 || response.errorCode == 23)) {
+                var documentids = "";
+                for (var i = 0; i < response.printStatus.length; i++) {
+                    var item = response.printStatus[i];
+                    if (i > 0) {
+                        documentids += ";";
+                    }
+                    documentids += item.documentID;
+                }
+                top._Float("/app/print/print/ErrorMsg.aspx?printer=" + $.escape(response.printer) +
+                    "&taskid=" + $.escape(response.taskID) +
+                    "&documentids=" + $.escape(documentids), "700px", _FloatCalcHeight(400, 20, 500));
+            }
+            else {
+                _AddlocalStorage(__FH_1CheckPrint, response, cmd);
+            }
+        }
+
+        if (response.status != 'success' && typeof (response.msg) != 'undefined')
+        {
+            var msg = response.msg;
+            var pi = response.requestID;
+
+            var friendyName = CnpWebSocket.ErrorMaps[msg];
+
+            if (friendyName != undefined && friendyName)
+            {
+                msg = friendyName;
+            }
+
+            if (typeof (pi) != "undefined")
+            {
+                var pp = ws.msgData["p" + pi];
+                if (pp != null &&
+                    typeof (pp) != "undefined" &&
+                    pp.hasOwnProperty("data"))
+                {
+                    if (pp.data.task)
+                    {
+                        msg = "任务编号：" + pp.data.task.taskID + "，" + msg;
+                    }
+
+                    ws.msgData["p" + pi] = null;
+                }
+            }
+
+            if (__IsShowPrintErrorMsg && (response.errorCode == 18 ||
+                response.errorCode == 21 || response.errorCode == 23))
+            {
+                console.log(msg);
+            }
+            else {
+                if (typeof (ws.onError) == "function") {
+                    ws.onError(500, msg);
+                }
+                else {
+                    ws.error(msg);
+                    alert(msg);
+                }
+            }
+            
+        }
+    }
+
+    function __take(ws)
+    {
+        if (!ws.ready)
+        {
+            if (window.top.IsCnpPrintTestUser)
+            {
+                $.msg(LOGGER.resources.cnpConnectFailed);
+            }
+
+            return;
+        }
+
+        try
+        {
+            var pi = ws.msgQueue.shift();
+            if (pi)
+            {
+                var pp = ws.msgData["p" + pi];
+                if (pp != null && typeof (pp) != "undefined")
+                {
+                    pp.data["index"] = pi;
+
+                    _AddlocalStorage(__FH_1CheckPrint, pp.data, "send");
+
+                    var ss = JSON.stringify(pp.data);
+                    ws.msgSocket.send(ss);
+                    ws.msgTimer = 0;
+                }
+            }
+            else
+            {
+                __next(ws);
+            }
+        }
+        catch (ex)
+        {
+            console.log(ws.appName + " take error:", ex);
+            if (typeof (ws.onError) == "function")
+            {
+                ws.onError(403, ex.message);
+            }
+            ws.load();
+        }
+    }
+
+    function __next(ws) {
+        if (ws.msgTimer >= -1) {
+            ws.msgTimer = window.setTimeout(__take, 500, ws);
+        }
+    }
+
+    if (this.appName == undefined) {
+        var ws = CnpWebSocket.prototype;
+        ws.appName = "Cnp.WebSocket";
+        ws.msgSocket = null;
+        ws.msgData = {};
+        ws.msgIndex = 0;
+        ws.msgQueue = [];
+        ws.msgTimer = -1;
+        ws.setInterval = -1;
+        ws.locked = false;
+        ws.ready = false;
+        ws.onLoaded = null;
+        ws.onError = null;
+        ws.onReceived = null;
+        ws.onSended = null;
+        ws.onClosed = null;
+        ws.readyTry = 0;
+        ws.getName = function (_window) {
+            return (_window || self).name;
+        };
+
+        ws.error = function (msg) {
+            if (console.error) {
+                console.error(msg);
+            }
+            else {
+                console.log(msg);
+            }
+        };
+
+
+        ws.load = function () {
+            var ws = this;
+            if (!ws.locked && !ws.ready && ws.msgTimer >= -1) {
+                try {
+                    var port = 13528;
+                    if (protocol == "wss") {
+                        port = 13529;
+                    }
+
+
+                    var socket = new WebSocket(protocol + "://localhost:" + port);
+                    socket.onopen = function (event) {
+                        ws.locked = true;
+                        socket.onmessage = function (event) {
+                            __receive(ws, event.data);
+                        };
+
+                        socket.onerror = function (event) {
+                            if (console.error) {
+                                console.error(ws.appName + " is error: ");
+                            }
+                            else {
+                                console.log(ws.appName + " is error: ", event);
+                            }
+
+                            if (typeof (ws.onError) == "function") {
+                                ws.onError(401, event.message);
+                            }
+
+                        };
+
+                        socket.onclose = function (event) {
+                            console.log(ws.appName + " is closed: ", event);
+                            ws.msgTimer = -1;
+
+                            delete ws.msgSocket;
+
+                            ws.msgSocket = null;
+                            ws.locked = false;
+                            ws.ready = false;
+                            if (typeof (ws.onClosed) == "function") {
+                                ws.onClosed(ws);
+                            }
+                        };
+
+                        //console.log(ws.appName + " is ready!");
+                        ws.msgSocket = socket;
+                        ws.locked = false;
+                        ws.ready = true;
+                        if (typeof (ws.onLoaded) == "function") {
+                            ws.onLoaded(ws);
+                        }
+                    };
+                }
+                catch (ex) {
+                    console.log(ws.appName + " load error: ", ex);
+                    if (typeof (ws.onError) == "function") {
+                        ws.onError(400, ex.message);
+                    }
+                    ws.msgSocket = null;
+                    ws.locked = false;
+                    ws.ready = false;
+                    ws.msgTimer = -1;
+                }
+            }
+        };
+
+        ws.getRequest = function (cmd) {
+            var request = new Object();
+            request.requestID = (++this.msgIndex) + '-' + __getUUID(8, 16);
+            request.version = "1.0";
+            request.cmd = cmd;
+            return request;
+        };
+
+        ws.send = function (request, callback, state) {
+            var ws = this;
+            if (!ws.ready) {
+                console.log(ws.appName + " no ready.");
+                if (typeof (ws.onError) == "function") {
+                    ws.onError(402, ws.appName + " no ready.");
+                }
+                return;
+            }
+
+            var index = request.requestID;
+            ws.msgQueue.push(index);
+            ws.msgData["p" + index] = { "data": request, "callback": callback, "state": state };
+
+            if (ws.msgTimer == -1) {
+                __next(ws);
+            }
+
+            if (typeof (ws.onSended) == "function")
+            {
+                ws.onSended(request);
+            }
+
+        };
+
+        ws.isBusy= function () {           
+            return ws.msgQueue.length > 0 ? true : false;
+        };
+    }
+
+    $(window).unload(this, function (event) {
+        var ws = event.data;
+        window.clearTimeout(ws.msgTimer);
+        ws.msgTimer = -2;
+        if (ws.ready) {
+            ws.ready = false;
+        }
+        ws.locked = false;
+        if (ws.msgSocket != null) {
+            try {
+                ws.msgSocket.close(4000);
+                ws.msgSocket = null;
+                console.log(ws.appName + " is unload.");
+            } catch (ex) {
+                console.log(ws.appName + " unload error:", ex);
+                if (typeof (ws.onError) == "function") {
+                    ws.onError(404, ex.message);
+                }
+            }
+        }
+    });
+}
+
+
+CnpWebSocket.ErrorMaps = [];
+CnpWebSocket.ErrorMaps["TaskID 重复"] = "重复打印。";
+
+
+
+function LOGGER() {
+}
+
+
+LOGGER.resources = {
+    cnpConnectFailed: "与菜鸟组件的连接失败，请确认菜鸟组件开启后，刷新ERP重新尝试。",
+    ajaxPostError: "异步请求打印数据异常，请按F12查看日志或刷新ERP后重新尝试。",
+    ajaxLoggerError: "菜鸟日志推送队列请求异常，请F12查看异常日志信息，联系客服人员。",
+    erpFrameError: "ERP系统连接菜鸟组件异常，请确保菜鸟组件开启的情况下，刷新ERP系统重新连接。"
+};
+
+LOGGER.frameError = function () {
+    $.msg(LOGGER.resources.erpFrameError);
+};
+
+/* debug */
+LOGGER.debug = function (item) {
+    if (window.top.jstPrinterDebug != undefined &&
+		window.top.jstPrinterDebug) {
+        console.log(item);
+    }
+};
+
+
+LOGGER.isCnpPrintMessage = function (message) {
+    /*
+	 *	判断当前数据包是否是合法的菜鸟数据包
+	 */
+    var requestID = message.requestID;
+
+    if (requestID == null || typeof (requestID) == "undefined" || !requestID || requestID.length <= 5) {
+        return false;
+    }
+
+    var prefixID = requestID.toString().substring(0, 4);
+
+    if (!__SUPPORTS.contains(prefixID, true)) {
+        return false;
+    }
+
+    var cmd = message.cmd;
+
+    if (cmd == null || typeof (cmd) == "undefined") {
+        return false;
+    }
+
+    var lowerCmd = cmd.toLowerCase();
+
+    if (lowerCmd == "print" || lowerCmd == "notifyprintresult") {
+        return true;
+    }
+
+    return false;
+
+}
+
+
+LOGGER.send = function (request) {
+    LOGGER.debug(request);
+
+    if (!LOGGER.isCnpPrintMessage(request)) {
+        return;
+    }
+
+    var msg = {};
+    msg.cmd = "sent";
+    msg.requestID = request.requestID;
+    msg.getTime = (new Date()).getTime();
+
+    if (request.task) {
+        msg.taskID = request.task.taskID;
+        msg.printer = request.task.printer;
+    }
+
+    var printForm = {};
+    printForm.msg = $.toJSON(msg);
+
+    if (msg.requestID.substring(0, 4) === "JST@")
+    {
+        LOGGER.pushToJst(printForm);
+    }
+    else
+    {
+        LOGGER.push(printForm);
+    }
+};
+
+
+LOGGER.message = function (response)
+{
+
+    LOGGER.debug(response);
+
+    if (!LOGGER.isCnpPrintMessage(response))
+    {
+        return;
+    }
+
+    response.getTime = (new Date()).getTime();
+    var printForm = {};
+    printForm.msg = $.toJSON(response);
+
+    if (response.requestID.substring(0, 4) === "JST@")
+    {
+        LOGGER.pushToJst(printForm);
+    }
+    else
+    {
+        LOGGER.push(printForm);
+    }
+
+};
+
+
+LOGGER.msgs = [];
+LOGGER.jstMsgs = [];
+
+LOGGER.push = function (printForm) {
+    LOGGER.msgs.push(printForm.msg);
+};
+
+LOGGER.pushToJst = function (printForm)
+{
+    LOGGER.jstMsgs.push(printForm.msg);
+}
+
+LOGGER.saveTimer = window.setInterval(function ()
+{
+    MessagesToServer();
+    try
+    {
+        JSTMessagesToServer();
+    }
+    catch (err)
+    {
+        console.error(err);
+    }
+}, 700);
+
+
+function MessagesToServer()
+{
+    var maxPackCount = 400;
+    var msg = [];
+
+    while (maxPackCount-- >= 0)
+    {
+        var shiftMsg = LOGGER.msgs.shift();
+
+        if (shiftMsg)
+        {
+            msg.push(shiftMsg);
+            continue;
+        }
+
+        break;
+    }
+
+    if (msg.length == 0)
+    {
+        return;
+    }
+
+    var printForm = {};
+    printForm.msgs = $.toJSON(msg);
+
+    if (window.top.jstPrinterDebug)
+    {
+        console.log(msg.length);
+    }
+
+    LOGGER.ajax(printForm);
+
+}
+
+
+function JSTMessagesToServer()
+{
+    var maxPackCount = 400;
+    var msgs = [];
+
+    while (maxPackCount-- >= 0)
+    {
+        var shiftMsg = LOGGER.jstMsgs.shift();
+
+        if (shiftMsg)
+        {
+            msgs.push(shiftMsg);
+            continue;
+        }
+
+        break;
+    }
+
+    if (msgs.length == 0)
+    {
+        return;
+    }
+
+    var printForm = {};
+    printForm.jsts = $.toJSON(msgs);
+
+    if (window.top.jstPrinterDebug)
+    {
+        console.log(msgs.length);
+    }
+
+    LOGGER.ajax(printForm);
+
+}
+
+
+LOGGER.getUniqueId = function ()
+{
+    if (window.top.jstSysEnvironment && window.top.jstSysEnvironment.shortIdentifiedNo)
+    {
+        return window.top.jstSysEnvironment.shortIdentifiedNo;
+    }
+
+    return "请更新打印助手";
+}
+
+
+LOGGER.ajax = function (printForm) {
+
+    printForm.unique_id = LOGGER.getUniqueId();
+
+    $.ajax("/app/print/printMessage.aspx", {
+        data: printForm,
+        dataType: 'json',
+        type: 'POST',
+
+        success: function (responseData) {
+            if (window.top.jstPrinterDebug) {
+                console.log(printForm);
+            }
+        },
+        error: function (_ajax, _msg, _ex) {
+            if (console.error) {
+                console.error(_msg + ':' + _ex);
+                console.error(LOGGER.resources.ajaxLoggerError);
+            }
+            else {
+                console.log(_msg + ':' + _ex);
+                console.log(LOGGER.resources.ajaxLoggerError);
+            }
+
+            // 重新推送的数据，this.data
+            window.setTimeout(function (printForm) {
+                LOGGER.ajax(printForm);
+
+            }, 15000, this.data);
+        }
+    });
+};
+
+
+$(window).on('beforeunload', function () {
+    if (LOGGER.msgs.length > 0) {
+        return "菜鸟监听没有发送完成，关闭页面可能导致打印日志缺失";
+    }
+});
+
+
+function _AddlocalStorage(fh_1CheckPrint, printData, step) {
+
+    if (!fh_1CheckPrint || !window.localStorage) {
+        return;
+    }
+
+    try {
+
+        var type = printData.requestID.split('|')[1].substring(0, 4);
+
+        if (type != "exp_") {
+            return;
+        }
+
+        
+        var key = "Canglong.FH_1.";
+
+        if (step == "notifyPrintResult") {
+            key += printData.requestID.split('|')[2];
+        }
+        else {
+            key += printData.Ioid;
+        }
+
+        var val = window.localStorage.getItem(key);
+
+        if (val) {
+            val = JSON.parse(val);
+            val.step += 1;
+            window.localStorage.setItem(key, JSON.stringify(val));
+        }
+    }
+    catch (ex) { }
+
+}

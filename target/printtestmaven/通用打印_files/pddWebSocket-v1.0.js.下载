@@ -1,0 +1,623 @@
+﻿/// <reference path="jquery-1.11.0.js" />
+
+function PddWebSocket(protocol) {
+	if (!(this instanceof PddWebSocket)) {
+		return new PddWebSocket(protocol);
+    }
+
+    function __getUUID(len, radix) {
+        var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('');
+        var uuid = [], i;
+        radix = radix || chars.length;
+        if (len) {
+            for (i = 0; i < len; i++) uuid[i] = chars[0 | Math.random() * radix];
+        } else {
+            var r;
+            uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
+            uuid[14] = '4';
+            for (i = 0; i < 36; i++) {
+                if (!uuid[i]) {
+                    r = 0 | Math.random() * 16;
+                    uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];
+                }
+            }
+        }
+        return uuid.join('');
+    }
+
+    function __receive(ws, msg)
+    {
+		
+        var response = JSON.parse(msg);
+
+        if (typeof (ws.onReceived) == "function")
+        {
+            ws.onReceived(response);
+        }
+
+        var cmd = response.cmd;
+
+        var pi = response.requestID;
+
+        var pp = null;
+
+        if (typeof (pi) != "undefined") {
+            pp = ws.msgData["p" + pi];
+        }
+
+        if (cmd == "print" || cmd == "getPrinters")
+        {
+            var pi = response.requestID;
+            if (typeof (pi) != "undefined") {
+                var pp = ws.msgData["p" + pi];
+
+                if (pp != null &&
+                    typeof (pp) != "undefined" &&
+                    pp.hasOwnProperty("callback") &&
+                    typeof (pp["callback"]) == "function") {
+                    try {
+
+                        _AddlocalStorage(__FH_1CheckPrint, pp["data"], cmd);
+
+                        pp.callback(pp["state"], pp["data"], response);
+                    }
+                    catch (ex) {
+                        console.log(ws.appName + " callback error:", ex);
+                    }
+                }
+                ws.msgData["p" + pi] = null;
+
+                //接收到Response时，执行下一个。					
+                __next(ws);
+                ws.msgTimer = -1;
+            }
+        }
+        else if(cmd == "PrintResultNotify")
+        {
+            var taskId = response.taskID;
+            if (typeof (taskId) != "undefined") {
+                var tt = ws.previewData["pre" + taskId];
+
+                if (tt != null &&
+                    typeof (tt) != "undefined" &&
+                    tt.hasOwnProperty("callback") &&
+                    typeof (tt["callback"]) == "function") {
+                    try {
+
+                        _AddlocalStorage(__FH_1CheckPrint, tt["data"], cmd);
+
+                        tt.callback(tt["state"], tt["data"], response);
+                    }
+                    catch (ex) {
+                        console.log(ws.appName + " PrintResultNotify callback error:", ex);
+                    }
+                }
+
+                ws.previewData["pre" + taskId] = null;
+            }
+        }
+        if (response.status != 'success' && typeof (response.msg) != 'undefined')
+        {
+            var msg = response.msg;
+            var pi = response.requestID;
+
+            var friendyName = CnpWebSocket.ErrorMaps[msg];
+
+            if (friendyName != undefined && friendyName)
+            {
+                msg = friendyName;
+            }
+
+            if (typeof (pi) != "undefined")
+            {
+                var pp = ws.msgData["p" + pi];
+                if (pp != null &&
+                    typeof (pp) != "undefined" &&
+                    pp.hasOwnProperty("data"))
+                {
+                    if (pp.data.task)
+                    {
+                        msg = "任务编号：" + pp.data.task.taskID + "，" + msg;
+                    }
+
+                    ws.msgData["p" + pi] = null;
+                }
+            }
+
+            if (typeof (ws.onError) == "function")
+            {
+                ws.onError(500, msg);
+            }
+            else
+            {
+                ws.error(msg);
+                alert(msg);
+            }
+        }
+    }
+
+    function __take(ws)
+    {
+        if (!ws.ready)
+        {
+        	if (window.top.IsPddPrintUser)
+            {
+                $.msg(PDD_LOGGER.resources.cnpConnectFailed);
+            }
+
+            return;
+        }
+
+        try
+        {
+            var pi = ws.msgQueue.shift();
+            if (pi)
+            {
+                var pp = ws.msgData["p" + pi];
+                if (pp != null && typeof (pp) != "undefined")
+                {
+                    pp.data["index"] = pi;
+
+                    _AddlocalStorage(__FH_1CheckPrint, pp.data, "send");
+
+                    var ss = JSON.stringify(pp.data);
+                    ws.msgSocket.send(ss);
+                    ws.msgTimer = 0;
+                }
+            }
+            else
+            {
+                __next(ws);
+            }
+        }
+        catch (ex)
+        {
+            console.log(ws.appName + " take error:", ex);
+            if (typeof (ws.onError) == "function")
+            {
+                ws.onError(403, ex.message);
+            }
+            ws.load();
+        }
+    }
+
+    function __next(ws) {
+        if (ws.msgTimer >= -1) {
+            ws.msgTimer = window.setTimeout(__take, 500, ws);
+        }
+    }
+
+    if (this.appName == undefined) {
+    	var ws = PddWebSocket.prototype;
+        ws.appName = "Pdd.WebSocket";
+        ws.msgSocket = null;
+        ws.msgData = {};
+        ws.previewData = {};
+        ws.msgIndex = 0;
+        ws.msgQueue = [];
+        ws.previewQueue = [];
+        ws.msgTimer = -1;
+        ws.setInterval = -1;
+        ws.locked = false;
+        ws.ready = false;
+        ws.onLoaded = null;
+        ws.onError = null;
+        ws.onReceived = null;
+        ws.onSended = null;
+        ws.onClosed = null;
+        ws.readyTry = 0;
+        ws.getName = function (_window) {
+            return (_window || self).name;
+        };
+
+        ws.error = function (msg) {
+            if (console.error) {
+                console.error(msg);
+            }
+            else {
+                console.log(msg);
+            }
+        };
+
+
+        ws.load = function () {
+            var ws = this;
+            if (!ws.locked && !ws.ready && ws.msgTimer >= -1) {
+                try {
+                    var port = 5000;
+                    if (protocol == "wss") {
+                        port = 18653;
+                    }
+
+                    var socket = new WebSocket(protocol + "://127.0.0.1:" + port);
+                    socket.onopen = function (event) {
+                        ws.locked = true;
+                        socket.onmessage = function (event) {
+                            __receive(ws, event.data);
+                        };
+
+                        socket.onerror = function (event) {
+                            if (console.error) {
+                                console.error(ws.appName + " is error: ");
+                            }
+                            else {
+                                console.log(ws.appName + " is error: ", event);
+                            }
+
+                            if (typeof (ws.onError) == "function") {
+                                ws.onError(401, event.message);
+                            }
+
+                        };
+
+                        socket.onclose = function (event) {
+                            console.log(ws.appName + " is closed: ", event);
+                            ws.msgTimer = -1;
+
+                            delete ws.msgSocket;
+
+                            ws.msgSocket = null;
+                            ws.locked = false;
+                            ws.ready = false;
+                            if (typeof (ws.onClosed) == "function") {
+                                ws.onClosed(ws);
+                            }
+                        };
+
+                        ws.msgSocket = socket;
+                        ws.locked = false;
+                        ws.ready = true;
+                        if (typeof (ws.onLoaded) == "function") {
+                            ws.onLoaded(ws);
+                        }
+                    };
+                }
+                catch (ex) {
+                    console.log(ws.appName + " load error: ", ex);
+                    if (typeof (ws.onError) == "function") {
+                        ws.onError(400, ex.message);
+                    }
+                    ws.msgSocket = null;
+                    ws.locked = false;
+                    ws.ready = false;
+                    ws.msgTimer = -1;
+                }
+            }
+        };
+
+
+        ws.getRequest = function (cmd) {
+            var request = new Object();
+            request.requestID = (++this.msgIndex) + '-' + __getUUID(8, 16);
+            request.version = "1.0";
+            request.cmd = cmd;
+            return request;
+        };
+
+        ws.send = function (request, callback, state) {
+            var ws = this;
+            if (!ws.ready) {
+                console.log(ws.appName + " no ready.");
+                if (typeof (ws.onError) == "function") {
+                    ws.onError(402, ws.appName + " no ready.");
+                }
+                return;
+            }
+
+            var index = request.requestID;
+            ws.msgQueue.push(index);
+            ws.msgData["p" + index] = { "data": request, "callback": callback, "state": state };
+
+            if (request.task.preview) {
+                var preIndex = request.task.taskID;
+                //ws.previewQueue.push(preIndex);
+                ws.previewData["pre" + preIndex] = { "data": request, "callback": callback, "state": state };
+            }
+
+            if (ws.msgTimer == -1) {
+                __next(ws);
+            }
+
+            if (typeof (ws.onSended) == "function")
+            {
+                ws.onSended(request);
+            }
+
+        };
+
+        ws.isBusy= function () {           
+            return ws.msgQueue.length > 0 ? true : false;
+        };
+    }
+
+    $(window).unload(this, function (event) {
+        var ws = event.data;
+        window.clearTimeout(ws.msgTimer);
+        ws.msgTimer = -2;
+        if (ws.ready) {
+            ws.ready = false;
+        }
+        ws.locked = false;
+        if (ws.msgSocket != null) {
+            try {
+                ws.msgSocket.close(4000);
+                ws.msgSocket = null;
+                console.log(ws.appName + " is unload.");
+            } catch (ex) {
+                console.log(ws.appName + " unload error:", ex);
+                if (typeof (ws.onError) == "function") {
+                    ws.onError(404, ex.message);
+                }
+            }
+        }
+    });
+}
+
+
+PddWebSocket.ErrorMaps = [];
+PddWebSocket.ErrorMaps["TaskID 重复"] = "重复打印。";
+
+
+
+function PDD_LOGGER() {
+}
+
+
+PDD_LOGGER.resources = {
+    cnpConnectFailed: "与拼多多组件的连接失败，请确认拼多多组件开启后，刷新ERP重新尝试。",
+    ajaxPostError: "异步请求打印数据异常，请按F12查看日志或刷新ERP后重新尝试。",
+    ajaxPDD_LOGGERError: "拼多多日志推送队列请求异常，请F12查看异常日志信息，联系客服人员。",
+    erpFrameError: "ERP系统连接拼多多组件异常，请确保拼多多组件开启的情况下，刷新ERP系统重新连接。"
+};
+
+PDD_LOGGER.frameError = function () {
+    $.msg(PDD_LOGGER.resources.erpFrameError);
+};
+
+/* debug */
+PDD_LOGGER.debug = function (item) {
+    if (window.top.jstPrinterDebug != undefined &&
+		window.top.jstPrinterDebug) {
+        console.log(item);
+    }
+};
+
+
+PDD_LOGGER.isCnpPrintMessage = function (message) {
+    /*
+	 *	判断当前数据包是否是合法的数据包
+	 */
+    var requestID = message.requestID;
+
+    if (requestID == null || typeof (requestID) == "undefined" || !requestID || requestID.length <= 5) {
+        return false;
+    }
+
+    var prefixID = requestID.toString().substring(0, 4);
+
+    if (!__SUPPORTS.contains(prefixID, true)) {
+        return false;
+    }
+
+    var cmd = message.cmd;
+
+    if (cmd == null || typeof (cmd) == "undefined") {
+        return false;
+    }
+
+    var lowerCmd = cmd.toLowerCase();
+
+    if (lowerCmd == "print" || lowerCmd == "notifyprintresult") {
+        return true;
+    }
+
+    return false;
+
+}
+
+
+PDD_LOGGER.send = function (request) {
+    PDD_LOGGER.debug(request);
+
+    if (!PDD_LOGGER.isCnpPrintMessage(request)) {
+        return;
+    }
+
+    var msg = {};
+    msg.cmd = "sent";
+    msg.requestID = request.requestID;
+    msg.getTime = (new Date()).getTime();
+
+    if (request.task) {
+        msg.taskID = request.task.taskID;
+        msg.printer = request.task.printer;
+    }
+
+    var printForm = {};
+    printForm.msg = $.toJSON(msg);
+
+    if (msg.requestID.substring(0, 4) === "JST@")
+    {
+        PDD_LOGGER.pushToJst(printForm);
+    }
+    else
+    {
+        PDD_LOGGER.push(printForm);
+    }
+};
+
+
+PDD_LOGGER.message = function (response)
+{
+
+    PDD_LOGGER.debug(response);
+
+    if (!PDD_LOGGER.isCnpPrintMessage(response))
+    {
+        return;
+    }
+
+    response.getTime = (new Date()).getTime();
+    var printForm = {};
+    printForm.msg = $.toJSON(response);
+
+    if (response.requestID.substring(0, 4) === "JST@")
+    {
+        PDD_LOGGER.pushToJst(printForm);
+    }
+    else
+    {
+        PDD_LOGGER.push(printForm);
+    }
+
+};
+
+
+PDD_LOGGER.msgs = [];
+PDD_LOGGER.jstMsgs = [];
+
+PDD_LOGGER.push = function (printForm) {
+    PDD_LOGGER.msgs.push(printForm.msg);
+};
+
+PDD_LOGGER.pushToJst = function (printForm)
+{
+    PDD_LOGGER.jstMsgs.push(printForm.msg);
+}
+
+PDD_LOGGER.saveTimer = window.setInterval(function ()
+{
+    PDD_MessagesToServer();
+    try
+    {
+        PDD_JSTMessagesToServer();
+    }
+    catch (err)
+    {
+        console.error(err);
+    }
+}, 700);
+
+
+function PDD_MessagesToServer()
+{
+    var maxPackCount = 400;
+    var msg = [];
+
+    while (maxPackCount-- >= 0)
+    {
+        var shiftMsg = PDD_LOGGER.msgs.shift();
+
+        if (shiftMsg)
+        {
+            msg.push(shiftMsg);
+            continue;
+        }
+
+        break;
+    }
+
+    if (msg.length == 0)
+    {
+        return;
+    }
+
+    var printForm = {};
+    printForm.msgs = $.toJSON(msg);
+
+    if (window.top.jstPrinterDebug)
+    {
+        console.log(msg.length);
+    }
+
+    PDD_LOGGER.ajax(printForm);
+
+}
+
+
+function PDD_JSTMessagesToServer()
+{
+    var maxPackCount = 400;
+    var msgs = [];
+
+    while (maxPackCount-- >= 0)
+    {
+        var shiftMsg = PDD_LOGGER.jstMsgs.shift();
+
+        if (shiftMsg)
+        {
+            msgs.push(shiftMsg);
+            continue;
+        }
+
+        break;
+    }
+
+    if (msgs.length == 0)
+    {
+        return;
+    }
+
+    var printForm = {};
+    printForm.jsts = $.toJSON(msgs);
+
+    if (window.top.jstPrinterDebug)
+    {
+        console.log(msgs.length);
+    }
+
+    PDD_LOGGER.ajax(printForm);
+
+}
+
+
+PDD_LOGGER.getUniqueId = function ()
+{
+    if (window.top.jstSysEnvironment && window.top.jstSysEnvironment.shortIdentifiedNo)
+    {
+        return window.top.jstSysEnvironment.shortIdentifiedNo;
+    }
+
+    return "请更新打印助手";
+}
+
+
+PDD_LOGGER.ajax = function (printForm) {
+
+    printForm.unique_id = PDD_LOGGER.getUniqueId();
+
+    $.ajax("/app/print/printMessage.aspx", {
+        data: printForm,
+        dataType: 'json',
+        type: 'POST',
+
+        success: function (responseData) {
+            if (window.top.jstPrinterDebug) {
+                console.log(printForm);
+            }
+        },
+        error: function (_ajax, _msg, _ex) {
+            if (console.error) {
+                console.error(_msg + ':' + _ex);
+                console.error(PDD_LOGGER.resources.ajaxPDD_LOGGERError);
+            }
+            else {
+                console.log(_msg + ':' + _ex);
+                console.log(PDD_LOGGER.resources.ajaxPDD_LOGGERError);
+            }
+
+            // 重新推送的数据，this.data
+            window.setTimeout(function (printForm) {
+                PDD_LOGGER.ajax(printForm);
+
+            }, 15000, this.data);
+        }
+    });
+};
+
+
+$(window).on('beforeunload', function () {
+    if (PDD_LOGGER.msgs.length > 0) {
+        return "拼多多监听没有发送完成，关闭页面可能导致打印日志缺失";
+    }
+});

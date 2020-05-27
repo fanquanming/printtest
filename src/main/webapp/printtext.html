@@ -1,0 +1,77 @@
+<!DOCTYPE html SYSTEM "http://www.thymeleaf.org/dtd/xhtml1-strict-thymeleaf-4.dtd">
+<html>
+<head>
+<meta charset="UTF-8">
+<title>打印</title>
+<link href="print3.css" type="text/css"
+	rel="stylesheet" />
+
+<style type="text/css">
+@media print {
+	@page {
+		size: 93mm 241mm;
+	}
+	@page :top {
+		top-center: 5mm;
+	}
+	body {
+		margin: 0cm auto;
+		padding: 0;
+	}
+	.page {
+		width: 241mm;
+		height: 114mm;
+		overflow: hidden;
+		border:1px solid red;
+	}
+	.title {
+		float: left;
+		width: 100%;
+		font-size: 18pt;
+		font-family: 楷体;
+		text-align: center;
+	}
+}
+</style>
+
+<script src="https://libs.baidu.com/jquery/1.8.3/jquery.min.js"></script> 
+
+<script language="javascript">
+	function printme() {
+		/* document.body.innerHTML = document.getElementById('print').innerHTML;
+		window.print(); */ 
+		
+		var printInnerHTML=$("#print").html();
+		var innerHTML = window.document.body.innerHTML;
+		var title = window.document.title;
+		
+		window.document.title = "出库单";
+		window.document.body.innerHTML=printInnerHTML;
+		window.print();
+		//
+		// window.document.title = title;
+		// window.document.body.innerHTML=innerHTML;
+	}
+</script>
+	<style>
+		.ly_height{height:30px}
+	</style>
+</head>
+<body>
+	<button onclick="javascrīpt:printme()" style="float:left;">打印</button>
+	<br/>
+	<br/>
+	<div id="print" >
+		<div class="book" id="0" style="padding-left: 30px;">
+			<div class="page">
+				<div class="subpage"  id="test">
+					
+				</div>
+			</div>
+		</div>
+		
+	</div>
+	<div th:include="templates/common/footer :: javascript"></div>
+	<script src="../static/hplus/js/css3-mediaqueries.js"></script>
+</body>
+</html>
