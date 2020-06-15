@@ -704,7 +704,7 @@
                 self.WriteLog("PRINT_TYPE:" + printType);
 
                 $("#debugger").val(self.jstClientDebug.toString());
-                console.log(rv);
+
                 _ACP("GetRequests", function (rv) {
                     alert("pa");
                     if (rv == undefined) {
@@ -724,7 +724,7 @@
 
                     if (rv) {
 
-                        console.log(rv);
+
                         self.isFastPrinting = 0;
                         var datas = $.parseJSON(rv);
                         self.WebSocketSend(0, datas, printType);
@@ -732,6 +732,7 @@
                 });
 
                 setTimeout(function () {
+
                     $("#fastPrint").removeAttr("disabled");
                 }, 500);
 

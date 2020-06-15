@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="prient">
+    <output-path>$PROJECT_DIR$/out/artifacts/prient</output-path>
+    <root id="root">
+      <element id="dir-copy" path="$PROJECT_DIR$/target/printtestmaven/WEB-INF" />
+    </root>
+  </artifact>
+</component>

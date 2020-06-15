@@ -1453,9 +1453,19 @@ function a1() {
 
 function a() {
     var oldstr = window.document.body.innerHTML;
-    var printData = window.document.getElementById("myprintpage").innerHTML;
-
-    window.document.body.innerHTML = printData;
+    //*************************************************dhj 动态赋值******************
+    var printData = window.document.getElementById("myprintpage");
+    var list=printData.getElementsByTagName('div');
+    for(var i=0;i<list.length;i++){
+        var classname=list[i].getAttribute("class");
+        if(classname=="data _findex dataitem"){
+           // alert("这是序号标签")
+            list[i].innerHTML="1001001";
+        }
+    }
+    、、*************************************end***********************************
+    var printData1 = window.document.getElementById("myprintpage").innerHTML;
+    window.document.body.innerHTML = printData1;
     window.print();
     window.document.body.innerHTML = oldstr;
     myprintback();
